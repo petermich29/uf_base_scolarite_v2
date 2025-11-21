@@ -15,7 +15,7 @@ DB_PORT = 5432
 INSTITUTION_FILE_PATH = r"C:\Users\OCELOU\Desktop\UF_DSE_DRIVE\UF_datasets\POWERQUERY\Institutions_Base.xlsx"
 
 METADATA_FILE_PATH = r"C:\Users\OCELOU\Desktop\UF_DSE_DRIVE\UF_datasets\PYTHON\Composante_Mention_Parcours_2025.xlsx"
-INSCRIPTION_FILE_PATH = r"C:\Users\OCELOU\Desktop\UF_DSE_DRIVE\UF_datasets\POWERQUERY\_UFALLTIME__KEYED.xlsx"
+INSCRIPTION_FILE_PATH = r"C:\Users\OCELOU\Desktop\UF_DSE_DRIVE\UF_datasets\POWERQUERY\sortie_nettoyage\_UFALLTIME_DATAS.xlsx"
 # ----------------------------------------
 
 # --- Chemins vers les dossiers de ressources statiques ---

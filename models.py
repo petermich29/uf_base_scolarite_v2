@@ -15,16 +15,20 @@ Base = declarative_base()
 
 class Institution(Base):
     __tablename__ = 'institutions'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint('Institution_code', name='uq_institution_code'),
+        {'extend_existing': True}
+    )
     
     # Clés et identifiants
-    Institution_id = Column(String(32), primary_key=True, unique=True, nullable=False) 
+    Institution_id = Column(String(10), primary_key=True, nullable=False) # String de taille 10
+    Institution_code = Column(String(32), unique=True, nullable=False) 
     
     # Attributs
-    Institution_nom = Column(String(255), nullable=False, unique=True)
+    Institution_nom = Column(String(255), nullable=False)
     Institution_type = Column(String(10), nullable=False)
     Institution_description = Column(Text, nullable=True)
-    Institution_abbreviation = Column(String(20), nullable=True) # Ex: UF
+    Institution_abbreviation = Column(String(20), nullable=True)
     Institution_logo_path = Column(String(255), nullable=True)
     
     # Relations
@@ -33,21 +37,25 @@ class Institution(Base):
 
 class Composante(Base):
     __tablename__ = 'composantes'
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint('Composante_code', name='uq_composante_code'),
+        {'extend_existing': True}
+    )
     
     # Clés et identifiants
-    Composante_code = Column(String(50), primary_key=True)
+    Composante_id = Column(String(12), primary_key=True) # String de taille 12
+    Composante_code = Column(String(50), unique=True)
     
     # Attributs
     Composante_label = Column(String(100))
     Composante_description = Column(Text, nullable=True) 
-    Composante_abbreviation = Column(String(20), nullable=True) # Ex: ENI, FS, FLSH
+    Composante_abbreviation = Column(String(20), nullable=True)
     Composante_logo_path = Column(String(255), nullable=True)
     
     # Clé étrangère mise à jour
     Institution_id_fk = Column(
-        String(32), 
-        ForeignKey('institutions.Institution_id'), # Mise à jour de la FK
+        String(10), # Taille mise à jour
+        ForeignKey('institutions.Institution_id'), 
         nullable=False
     ) 
     
@@ -61,7 +69,8 @@ class Domaine(Base):
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    Domaine_code = Column(String(20), primary_key=True)
+    Domaine_id = Column(String(20), primary_key=True)
+    Domaine_code = Column(String(20), unique=True) # Ajout du champ de code unique
     
     # Attributs
     Domaine_label = Column(String(100))
@@ -73,30 +82,30 @@ class Domaine(Base):
 class Mention(Base):
     __tablename__ = 'mentions'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint('Mention_code', 'Composante_code_fk', name='unique_mention_code_composante'),
+        # Contrainte d'unicité sur le code mention et la composante
+        UniqueConstraint('Mention_code', 'Composante_id_fk', name='unique_mention_code_composante'),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    Mention_id = Column(String(50), primary_key=True) 
+    Mention_id = Column(String(12), primary_key=True) # String de taille 12
+    Mention_code = Column(String(30), nullable=False)
     
     # Attributs
-    Mention_code = Column(String(30), nullable=False)
     Mention_label = Column(String(100))
     Mention_description = Column(Text, nullable=True) 
-    Mention_abbreviation = Column(String(20), nullable=True) # Ex: MI (Maths Info), SVE (Sciences de la Vie)
+    Mention_abbreviation = Column(String(20), nullable=True)
     Mention_logo_path = Column(String(255), nullable=True) 
     
     # Clés étrangères mises à jour
-    Composante_code_fk = Column(
-        String(50), 
-        ForeignKey('composantes.Composante_code'), # Mise à jour de la FK
+    Composante_id_fk = Column(
+        String(12), # Taille mise à jour
+        ForeignKey('composantes.Composante_id'), 
         nullable=False
     )
-    Domaine_code_fk = Column(
-        String(20), 
-        ForeignKey('domaines.Domaine_code'), # Mise à jour de la FK
+    Domaine_id_fk = Column(
+        String(20), # Taille mise à jour
+        ForeignKey('domaines.Domaine_id'), 
         nullable=False
     )
     
@@ -106,33 +115,33 @@ class Mention(Base):
 class Parcours(Base):
     __tablename__ = 'parcours'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
+        # Contrainte d'unicité sur le code parcours et la mention
         UniqueConstraint('Parcours_code', 'Mention_id_fk', name='unique_parcours_code_mention'),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    Parcours_id = Column(String(50), primary_key=True)
+    Parcours_id = Column(String(15), primary_key=True) # String de taille 15
+    Parcours_code = Column(String(20), nullable=False)
     
     # Attributs
-    Parcours_code = Column(String(20), nullable=False)
     Parcours_label = Column(String(100))
     Parcours_description = Column(Text, nullable=True) 
-    Parcours_abbreviation = Column(String(20), nullable=True) # Ex: MISS, BMC, EC
+    Parcours_abbreviation = Column(String(20), nullable=True)
     Parcours_logo_path = Column(String(255), nullable=True)
     Parcours_date_creation = Column(Integer, nullable=True)
     Parcours_date_fin = Column(Integer, nullable=True)
 
     # Clés étrangères mises à jour
     Mention_id_fk = Column(
-        String(50), 
-        ForeignKey('mentions.Mention_id'), # Mise à jour de la FK
+        String(12), # Taille mise à jour
+        ForeignKey('mentions.Mention_id'), 
         nullable=False
     )
 
-    Parcours_type_formation_defaut_fk = Column(
+    Parcours_type_formation_defaut_code_fk = Column(
         String(10), 
-        ForeignKey('types_formation.TypeFormation_code'), # Mise à jour de la FK
+        ForeignKey('types_formation.TypeFormation_code'), 
         nullable=False, 
         default='FI' 
     )
@@ -141,32 +150,28 @@ class Parcours(Base):
     type_formation_defaut = relationship("TypeFormation", back_populates="parcours")
     niveaux_couverts = relationship("ParcoursNiveau", back_populates="parcours_lie")
 
-# -------------------------------------------------------------------
-# --- TABLES DE RÉFÉRENCE: STRUCTURE LMD (CYCLE, NIVEAU, SEMESTRE) ---
-# -------------------------------------------------------------------
+# Tables de Référence LMD et UE/EC
 
 # --- TABLES D'ASSOCIATION ---
 class ParcoursNiveau(Base):
-    """ Table de liaison N:M entre un Parcours et les Niveaux (L1, M1, etc.) qu'il couvre. """
     __tablename__ = 'parcours_niveaux'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint('Parcours_id_fk', 'Niveau_code_fk', name='uq_parcours_niveau_unique'),
+        UniqueConstraint('Parcours_id_fk', 'Niveau_id_fk', name='uq_parcours_niveau_unique'),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    ParcoursNiveau_id = Column(Integer, primary_key=True, autoincrement=True)
+    ParcoursNiveau_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés étrangères mises à jour
+    # Clés étrangères
     Parcours_id_fk = Column(
-        String(50), 
-        ForeignKey('parcours.Parcours_id'), # Mise à jour de la FK
+        String(15), # Taille mise à jour
+        ForeignKey('parcours.Parcours_id'), 
         nullable=False
     )
-    Niveau_code_fk = Column(
-        String(10), 
-        ForeignKey('niveaux.Niveau_code'), # Mise à jour de la FK
+    Niveau_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('niveaux.Niveau_id'), 
         nullable=False
     )
     
@@ -182,7 +187,8 @@ class Cycle(Base):
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    Cycle_code = Column(String(10), primary_key=True)
+    Cycle_id = Column(String(10), primary_key=True)
+    Cycle_code = Column(String(10), unique=True) # Ajout du champ de code unique
     
     # Attributs
     Cycle_label = Column(String(50), unique=True, nullable=False)
@@ -196,15 +202,16 @@ class Niveau(Base):
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    Niveau_code = Column(String(10), primary_key=True)
+    Niveau_id = Column(String(10), primary_key=True)
+    Niveau_code = Column(String(10), unique=True) # Ajout du champ de code unique
     
     # Attributs
     Niveau_label = Column(String(50)) 
     
-    # Clé étrangère mise à jour
-    Cycle_code_fk = Column(
-        String(10), 
-        ForeignKey('cycles.Cycle_code'), # Mise à jour de la FK
+    # Clé étrangère
+    Cycle_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('cycles.Cycle_id'), 
         nullable=False
     )
     
@@ -216,21 +223,21 @@ class Niveau(Base):
 class Semestre(Base):
     __tablename__ = 'semestres'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint('Niveau_code_fk', 'Semestre_numero', name='uq_niveau_numero_semestre'), 
+        UniqueConstraint('Niveau_id_fk', 'Semestre_numero', name='uq_niveau_numero_semestre'), 
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    Semestre_code = Column(String(10), primary_key=True) # Ex: L1_S01
+    Semestre_id = Column(String(10), primary_key=True) 
+    Semestre_code = Column(String(10), unique=True) # Ajout du champ de code unique
     
     # Attributs
-    Semestre_numero = Column(String(10), nullable=False) # Ex: S01
+    Semestre_numero = Column(String(10), nullable=False) 
     
-    # Clé étrangère mise à jour
-    Niveau_code_fk = Column(
-        String(10), 
-        ForeignKey('niveaux.Niveau_code'), # Mise à jour de la FK
+    # Clé étrangère
+    Niveau_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('niveaux.Niveau_id'), 
         nullable=False
     )
     
@@ -249,16 +256,16 @@ class UniteEnseignement(Base):
     
     # Clés et identifiants
     UE_id = Column(String(50), primary_key=True)
+    UE_code = Column(String(20), unique=True, nullable=False)
     
     # Attributs
-    UE_code = Column(String(20), unique=True, nullable=False)
     UE_intitule = Column(String(255), nullable=False)
     UE_credit = Column(Integer, nullable=False)
     
-    # Clé étrangère mise à jour
-    Semestre_code_fk = Column(
-        String(10), 
-        ForeignKey('semestres.Semestre_code'), # Mise à jour de la FK
+    # Clé étrangère
+    Semestre_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('semestres.Semestre_id'), 
         nullable=False
     )
     
@@ -274,16 +281,16 @@ class ElementConstitutif(Base):
     
     # Clés et identifiants
     EC_id = Column(String(50), primary_key=True)
+    EC_code = Column(String(20), unique=True, nullable=False)
     
     # Attributs
-    EC_code = Column(String(20), unique=True, nullable=False)
     EC_intitule = Column(String(255), nullable=False)
     EC_coefficient = Column(Integer, default=1, nullable=False)
     
-    # Clé étrangère mise à jour
+    # Clé étrangère
     UE_id_fk = Column(
-        String(50), 
-        ForeignKey('unites_enseignement.UE_id'), # Mise à jour de la FK
+        String(50), # Taille mise à jour
+        ForeignKey('unites_enseignement.UE_id'), 
         nullable=False
     )
     
@@ -294,18 +301,18 @@ class ElementConstitutif(Base):
     affectations = relationship("AffectationEC", back_populates="element_constitutif")
 
 # ===================================================================
-# --- TABLES DE RÉFÉRENCE: SESSIONS D'EXAMEN ---
+# --- TABLES DE RÉFÉRENCE: SESSIONS D'EXAMEN et TYPES ---
 # ===================================================================
 class SessionExamen(Base):
-    """ Table conservée pour les sessions d'examen (ex: Normale, Rattrapage) """
     __tablename__ = 'sessions_examen'
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    SessionExamen_code = Column(String(5), primary_key=True) # Ex: N, R
+    SessionExamen_id = Column(String(5), primary_key=True) # Ajout d'ID
+    SessionExamen_code = Column(String(5), unique=True)
     
     # Attributs
-    SessionExamen_label = Column(String(50), nullable=False, unique=True) # Ex: Normale, Rattrapage
+    SessionExamen_label = Column(String(50), nullable=False, unique=True)
     
     # Relations
     notes_session = relationship("Note", back_populates="session")
@@ -313,16 +320,13 @@ class SessionExamen(Base):
     resultats_semestre = relationship("ResultatSemestre", backref="session_resultat_semestre")
 
 
-# -------------------------------------------------------------------
-# --- TABLES DE RÉFÉRENCE: TYPE D'INSCRIPTION ---
-# -------------------------------------------------------------------
-
-class ModeInscription(Base): 
+class ModeInscription(Base):
     __tablename__ = 'modes_inscription' 
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    ModeInscription_code = Column(String(10), primary_key=True) # Ex: 'CLAS', 'HYB'
+    ModeInscription_id = Column(String(10), primary_key=True)
+    ModeInscription_code = Column(String(10), unique=True)
     
     # Attributs
     ModeInscription_label = Column(String(50), nullable=False, unique=True)
@@ -331,16 +335,13 @@ class ModeInscription(Base):
     # Relations
     inscriptions = relationship("Inscription", back_populates="mode_inscription") 
 
-# ===================================================================
-# --- TABLES DE RÉFÉRENCE: TYPE DE FORMATION ---
-# ===================================================================
-
 class TypeFormation(Base):
     __tablename__ = 'types_formation'
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    TypeFormation_code = Column(String(10), primary_key=True) # Ex: FI, FC, FOAD
+    TypeFormation_id = Column(String(10), primary_key=True)
+    TypeFormation_code = Column(String(10), unique=True, nullable=False)
     
     # Attributs
     TypeFormation_label = Column(String(50), nullable=False, unique=True)
@@ -359,7 +360,8 @@ class AnneeUniversitaire(Base):
     __table_args__ = {'extend_existing': True} 
     
     # Clés et identifiants
-    AnneeUniversitaire_annee = Column(String(9), primary_key=True)
+    AnneeUniversitaire_id = Column(String(9), primary_key=True) # L'année sert d'ID
+    AnneeUniversitaire_annee = Column(String(9), unique=True) # Ajout d'un champ code/annee unique
     
     # Attributs
     AnneeUniversitaire_description = Column(Text, nullable=True) 
@@ -380,7 +382,8 @@ class Etudiant(Base):
     )
     
     # Clés et identifiants
-    Etudiant_code = Column(String(50), primary_key=True) 
+    Etudiant_id = Column(String(50), primary_key=True) 
+    Etudiant_code = Column(String(50), unique=True) # L'ancien code_etudiant renommé
     
     # Attributs
     Etudiant_numero_inscription = Column(String(100))
@@ -392,7 +395,9 @@ class Etudiant(Base):
     Etudiant_nationalite = Column(String(50))
     Etudiant_bacc_annee = Column(Integer, nullable=True)
     Etudiant_bacc_serie = Column(String(50)) 
+    Etudiant_bacc_numero = Column(String(10)) 
     Etudiant_bacc_centre = Column(String(100))
+    Etudiant_bacc_mention = Column(String(20))
     Etudiant_adresse = Column(String(255))
     Etudiant_telephone = Column(String(50))
     Etudiant_mail = Column(String(100))
@@ -414,44 +419,45 @@ class Etudiant(Base):
 class Inscription(Base):
     __tablename__ = 'inscriptions'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
+        # Clé composée basée sur les ID/Codes pour l'unicité
         UniqueConstraint(
-            'Etudiant_code_fk', 
-            'AnneeUniversitaire_annee_fk', 
+            'Etudiant_id_fk', 
+            'AnneeUniversitaire_id_fk', 
             'Parcours_id_fk', 
-            'Semestre_code_fk', 
+            'Semestre_id_fk', 
             name='uq_etudiant_annee_parcours_semestre' 
         ),
         {'extend_existing': True} 
     )
     
     # Clés et identifiants
-    Inscription_code = Column(String(100), primary_key=True)
+    Inscription_id = Column(String(100), primary_key=True)
+    Inscription_code = Column(String(100), unique=True) # Code d'inscription si différent de l'ID
     
-    # Clés étrangères mises à jour
-    Etudiant_code_fk = Column(
+    # Clés étrangères
+    Etudiant_id_fk = Column(
         String(50), 
-        ForeignKey('etudiants.Etudiant_code'), # Mise à jour de la FK
+        ForeignKey('etudiants.Etudiant_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
     Parcours_id_fk = Column(
-        String(50), 
-        ForeignKey('parcours.Parcours_id'), # Mise à jour de la FK
+        String(15), # Taille mise à jour
+        ForeignKey('parcours.Parcours_id'), 
         nullable=False
     )
-    Semestre_code_fk = Column(
-        String(10), 
-        ForeignKey('semestres.Semestre_code'), # Mise à jour de la FK
+    Semestre_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('semestres.Semestre_id'), 
         nullable=False
     )
-    ModeInscription_code_fk = Column(
-        String(10), 
-        ForeignKey('modes_inscription.ModeInscription_code'), # Mise à jour de la FK
+    ModeInscription_id_fk = Column(
+        String(10), # Taille mise à jour
+        ForeignKey('modes_inscription.ModeInscription_id'), 
         nullable=False
     ) 
     
@@ -470,38 +476,31 @@ class Inscription(Base):
 class ResultatSemestre(Base):
     __tablename__ = 'resultats_semestre'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint(
-            'Etudiant_code_fk', 
-            'Semestre_code_fk', 
-            'AnneeUniversitaire_annee_fk', 
-            'SessionExamen_code_fk', 
-            name='uq_resultat_semestre_session'
-        ),
+        UniqueConstraint('Etudiant_id_fk', 'Semestre_id_fk', 'AnneeUniversitaire_id_fk', 'SessionExamen_id_fk', name='uq_resultat_semestre_session'),
     )
     
     # Clés et identifiants
-    ResultatSemestre_id = Column(Integer, primary_key=True, autoincrement=True)
+    ResultatSemestre_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés Étrangères mises à jour
-    Etudiant_code_fk = Column(
+    # Clés Étrangères
+    Etudiant_id_fk = Column(
         String(50), 
-        ForeignKey('etudiants.Etudiant_code'), # Mise à jour de la FK
+        ForeignKey('etudiants.Etudiant_id'), 
         nullable=False
     )
-    Semestre_code_fk = Column(
-        String(50), 
-        ForeignKey('semestres.Semestre_code'), # Mise à jour de la FK
-        nullable=False
-    )
-    AnneeUniversitaire_annee_fk = Column(
+    Semestre_id_fk = Column(
         String(10), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('semestres.Semestre_id'), 
         nullable=False
     )
-    SessionExamen_code_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
+        String(9), 
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
+        nullable=False
+    )
+    SessionExamen_id_fk = Column(
         String(5), 
-        ForeignKey('sessions_examen.SessionExamen_code'), # Mise à jour de la FK
+        ForeignKey('sessions_examen.SessionExamen_id'), 
         nullable=False
     )
     
@@ -521,44 +520,37 @@ class ResultatSemestre(Base):
     annee_univ = relationship("AnneeUniversitaire") 
 
     def __repr__(self):
-        return (f"<ResultatSemestre {self.Etudiant_code_fk} - {self.Semestre_code_fk} "
-                f"(Sess: {self.SessionExamen_code_fk}, Moy: {self.ResultatSemestre_moyenne_obtenue}): {self.ResultatSemestre_statut_validation}>") 
+        return (f"<ResultatSemestre {self.Etudiant_id_fk} - {self.Semestre_id_fk} "
+                f"(Sess: {self.SessionExamen_id_fk}, Moy: {self.ResultatSemestre_moyenne_obtenue}): {self.ResultatSemestre_statut_validation}>") 
     
 class ResultatUE(Base):
     __tablename__ = 'resultats_ue'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint(
-            'Etudiant_code_fk', 
-            'UE_id_fk', 
-            'AnneeUniversitaire_annee_fk', 
-            'SessionExamen_code_fk', 
-            name='uq_resultat_ue_unique'
-        ),
+        UniqueConstraint('Etudiant_id_fk', 'UE_id_fk', 'AnneeUniversitaire_id_fk', 'SessionExamen_id_fk', name='uq_resultat_ue_unique'),
     )
     
     # Clés et identifiants
-    ResultatUE_id = Column(Integer, primary_key=True, autoincrement=True)
+    ResultatUE_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés Étrangères mises à jour
-    Etudiant_code_fk = Column(
+    # Clés Étrangères
+    Etudiant_id_fk = Column(
         String(50), 
-        ForeignKey('etudiants.Etudiant_code'), # Mise à jour de la FK
+        ForeignKey('etudiants.Etudiant_id'), 
         nullable=False
     )
     UE_id_fk = Column(
         String(50), 
-        ForeignKey('unites_enseignement.UE_id'), # Mise à jour de la FK
+        ForeignKey('unites_enseignement.UE_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
-    SessionExamen_code_fk = Column(
+    SessionExamen_id_fk = Column(
         String(5), 
-        ForeignKey('sessions_examen.SessionExamen_code'), # Mise à jour de la FK
+        ForeignKey('sessions_examen.SessionExamen_id'), 
         nullable=False
     ) 
     
@@ -574,50 +566,49 @@ class ResultatUE(Base):
     annee_univ = relationship("AnneeUniversitaire", back_populates="resultats_ue")
     
     def __repr__(self):
-        return (f"<ResultatUE {self.Etudiant_code_fk} - {self.UE_id_fk} "
-                f"(Sess: {self.SessionExamen_code_fk}, Moy: {self.ResultatUE_moyenne}): {self.ResultatUE_is_acquise}>")
+        return (f"<ResultatUE {self.Etudiant_id_fk} - {self.UE_id_fk} "
+                f"(Sess: {self.SessionExamen_id_fk}, Moy: {self.ResultatUE_moyenne}): {self.ResultatUE_is_acquise}>")
 
 class Note(Base):
     __tablename__ = 'notes'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
         UniqueConstraint(
-            'Etudiant_code_fk', 
+            'Etudiant_id_fk', 
             'EC_id_fk', 
-            'AnneeUniversitaire_annee_fk',
-            'SessionExamen_code_fk',
+            'AnneeUniversitaire_id_fk',
+            'SessionExamen_id_fk',
             name='uq_etudiant_ec_annee_session' 
         ),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    Note_id = Column(Integer, primary_key=True, autoincrement=True)
+    Note_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés Étrangères Composites mises à jour
-    Etudiant_code_fk = Column(
+    # Clés Étrangères Composites
+    Etudiant_id_fk = Column(
         String(50), 
-        ForeignKey('etudiants.Etudiant_code'), # Mise à jour de la FK
+        ForeignKey('etudiants.Etudiant_id'), 
         nullable=False
     )
     EC_id_fk = Column(
         String(50), 
-        ForeignKey('elements_constitutifs.EC_id'), # Mise à jour de la FK
+        ForeignKey('elements_constitutifs.EC_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
-    SessionExamen_code_fk = Column(
+    SessionExamen_id_fk = Column(
         String(5), 
-        ForeignKey('sessions_examen.SessionExamen_code'), # Mise à jour de la FK
+        ForeignKey('sessions_examen.SessionExamen_id'), 
         nullable=False
     )
     
     # Attributs
-    Note_valeur = Column(Numeric(5, 2), nullable=False) 
+    Note_valeur = Column(Numeric(5, 2), nullable=False)
 
     # Relations
     etudiant = relationship("Etudiant", back_populates="notes_obtenues") 
@@ -626,30 +617,29 @@ class Note(Base):
     session = relationship("SessionExamen", back_populates="notes_session")
 
     def __repr__(self):
-        return (f"<Note {self.Etudiant_code_fk} - {self.EC_id_fk} "
-                f"({self.AnneeUniversitaire_annee_fk}, {self.SessionExamen_code_fk}): {self.Note_valeur}>")
+        return (f"<Note {self.Etudiant_id_fk} - {self.EC_id_fk} "
+                f"({self.AnneeUniversitaire_id_fk}, {self.SessionExamen_id_fk}): {self.Note_valeur}>")
 
 
 class SuiviCreditCycle(Base):
     __tablename__ = 'suivi_credits_cycles'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint('Etudiant_code_fk', 'Cycle_code_fk', name='uq_etudiant_cycle_credit'),
+        UniqueConstraint('Etudiant_id_fk', 'Cycle_id_fk', name='uq_etudiant_cycle_credit'),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    SuiviCreditCycle_id = Column(Integer, primary_key=True, autoincrement=True)
+    SuiviCreditCycle_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés étrangères mises à jour
-    Etudiant_code_fk = Column(
+    # Clés étrangères
+    Etudiant_id_fk = Column(
         String(50), 
-        ForeignKey('etudiants.Etudiant_code'), # Mise à jour de la FK
+        ForeignKey('etudiants.Etudiant_id'), 
         nullable=False
     )
-    Cycle_code_fk = Column(
+    Cycle_id_fk = Column(
         String(10), 
-        ForeignKey('cycles.Cycle_code'), # Mise à jour de la FK
+        ForeignKey('cycles.Cycle_id'), 
         nullable=False
     )
     
@@ -688,10 +678,10 @@ class Enseignant(Base):
         nullable=False
     )
     
-    # Clé étrangère mise à jour
-    Composante_code_affectation_fk = Column(
-        String(50), 
-        ForeignKey('composantes.Composante_code'), # Mise à jour de la FK
+    # Clé étrangère
+    Composante_id_affectation_fk = Column(
+        String(12), # Taille mise à jour
+        ForeignKey('composantes.Composante_id'), 
         nullable=True
     )
     
@@ -712,12 +702,12 @@ class Enseignant(Base):
 
 
 class TypeEnseignement(Base):
-    """ Types de charge: Cours, TD, TP """
     __tablename__ = 'types_enseignement'
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    TypeEnseignement_code = Column(String(10), primary_key=True) # Ex: C, TD, TP
+    TypeEnseignement_id = Column(String(10), primary_key=True)
+    TypeEnseignement_code = Column(String(10), unique=True) # Ajout d'un champ code unique
     
     # Attributs
     TypeEnseignement_label = Column(String(50), unique=True, nullable=False)
@@ -730,33 +720,32 @@ class TypeEnseignement(Base):
 class VolumeHoraireEC(Base):
     __tablename__ = 'volume_horaire_ec'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
         UniqueConstraint(
             'EC_id_fk', 
-            'TypeEnseignement_code_fk', 
-            'AnneeUniversitaire_annee_fk', 
+            'TypeEnseignement_id_fk', 
+            'AnneeUniversitaire_id_fk', 
             name='uq_ec_vh_type_annee'
         ),
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    VolumeHoraireEC_id = Column(Integer, primary_key=True, autoincrement=True)
+    VolumeHoraireEC_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés étrangères mises à jour
+    # Clés étrangères
     EC_id_fk = Column(
         String(50), 
-        ForeignKey('elements_constitutifs.EC_id'), # Mise à jour de la FK
+        ForeignKey('elements_constitutifs.EC_id'), 
         nullable=False
     )
-    TypeEnseignement_code_fk = Column(
+    TypeEnseignement_id_fk = Column(
         String(10), 
-        ForeignKey('types_enseignement.TypeEnseignement_code'), # Mise à jour de la FK
+        ForeignKey('types_enseignement.TypeEnseignement_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
     
@@ -772,38 +761,37 @@ class VolumeHoraireEC(Base):
 class AffectationEC(Base):
     __tablename__ = 'affectations_ec'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
         UniqueConstraint(
             'EC_id_fk', 
-            'TypeEnseignement_code_fk', 
-            'AnneeUniversitaire_annee_fk', 
+            'TypeEnseignement_id_fk', 
+            'AnneeUniversitaire_id_fk', 
             name='uq_affectation_unique'
         ), 
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    AffectationEC_id = Column(Integer, primary_key=True, autoincrement=True)
+    AffectationEC_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés étrangères mises à jour
+    # Clés étrangères
     Enseignant_id_fk = Column(
         String(50), 
-        ForeignKey('enseignants.Enseignant_id'), # Mise à jour de la FK
+        ForeignKey('enseignants.Enseignant_id'), 
         nullable=False
     )
     EC_id_fk = Column(
         String(50), 
-        ForeignKey('elements_constitutifs.EC_id'), # Mise à jour de la FK
+        ForeignKey('elements_constitutifs.EC_id'), 
         nullable=False
     )
-    TypeEnseignement_code_fk = Column(
+    TypeEnseignement_id_fk = Column(
         String(10), 
-        ForeignKey('types_enseignement.TypeEnseignement_code'), # Mise à jour de la FK
+        ForeignKey('types_enseignement.TypeEnseignement_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
     
@@ -823,28 +811,27 @@ class AffectationEC(Base):
 class Jury(Base):
     __tablename__ = 'jurys'
     __table_args__ = (
-        # Mise à jour de la contrainte d'unicité
-        UniqueConstraint('Semestre_code_fk', 'AnneeUniversitaire_annee_fk', name='uq_jury_unique'), 
+        UniqueConstraint('Semestre_id_fk', 'AnneeUniversitaire_id_fk', name='uq_jury_unique'), 
         {'extend_existing': True}
     )
     
     # Clés et identifiants
-    Jury_id = Column(Integer, primary_key=True, autoincrement=True)
+    Jury_id = Column(String(50), primary_key=True) # Changement en String
     
-    # Clés Étrangères Composites mises à jour
+    # Clés Étrangères Composites
     Enseignant_id_fk = Column(
         String(50), 
-        ForeignKey('enseignants.Enseignant_id'), # Mise à jour de la FK
+        ForeignKey('enseignants.Enseignant_id'), 
         nullable=False
     )
-    Semestre_code_fk = Column(
+    Semestre_id_fk = Column(
         String(10), 
-        ForeignKey('semestres.Semestre_code'), # Mise à jour de la FK
+        ForeignKey('semestres.Semestre_id'), 
         nullable=False
     )
-    AnneeUniversitaire_annee_fk = Column(
+    AnneeUniversitaire_id_fk = Column(
         String(9), 
-        ForeignKey('annees_universitaires.AnneeUniversitaire_annee'), # Mise à jour de la FK
+        ForeignKey('annees_universitaires.AnneeUniversitaire_id'), 
         nullable=False
     )
     
@@ -857,5 +844,5 @@ class Jury(Base):
     annee_univ_jury = relationship("AnneeUniversitaire")
     
     def __repr__(self):
-        return (f"<Jury Sémestre {self.Semestre_code_fk} ({self.AnneeUniversitaire_annee_fk}) "
+        return (f"<Jury Sémestre {self.Semestre_id_fk} ({self.AnneeUniversitaire_id_fk}) "
                 f"présidé par {self.Enseignant_id_fk}>")
