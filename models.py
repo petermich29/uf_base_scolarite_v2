@@ -308,7 +308,7 @@ class SessionExamen(Base):
     __table_args__ = {'extend_existing': True}
     
     # Clés et identifiants
-    SessionExamen_id = Column(String(5), primary_key=True) # Ajout d'ID
+    SessionExamen_id = Column(String(8), primary_key=True) # Ajout d'ID
     SessionExamen_code = Column(String(5), unique=True)
     
     # Attributs
@@ -317,7 +317,10 @@ class SessionExamen(Base):
     # Relations
     notes_session = relationship("Note", back_populates="session")
     resultats_ue_session = relationship("ResultatUE", back_populates="session")
-    resultats_semestre = relationship("ResultatSemestre", backref="session_resultat_semestre")
+    resultats_semestre_collection = relationship(
+        "ResultatSemestre", 
+        back_populates="session_examen" # Correspond à l'attribut dans ResultatSemestre
+    )
 
 
 class ModeInscription(Base):
@@ -499,7 +502,7 @@ class ResultatSemestre(Base):
         nullable=False
     )
     SessionExamen_id_fk = Column(
-        String(5), 
+        String(8), 
         ForeignKey('sessions_examen.SessionExamen_id'), 
         nullable=False
     )
@@ -507,7 +510,7 @@ class ResultatSemestre(Base):
     # Attributs
     ResultatSemestre_statut_validation = Column(
         String(5), 
-        CheckConstraint("ResultatSemestre_statut_validation IN ('V', 'NV', 'AJ')", name='check_statut_validation'), 
+        CheckConstraint(""" "ResultatSemestre_statut_validation" IN ('V', 'NV', 'AJ') """, name='check_statut_validation'), 
         nullable=False
     )
     ResultatSemestre_credits_acquis = Column(Numeric(4, 1)) 
@@ -515,8 +518,11 @@ class ResultatSemestre(Base):
     
     # Relations
     etudiant_resultat = relationship("Etudiant", back_populates="resultats_semestre")
-    semestre = relationship("Semestre")
-    session = relationship("SessionExamen", backref="resultats_semestre") 
+    semestre = relationship("Semestre") 
+    session_examen = relationship(
+        "SessionExamen", 
+        back_populates="resultats_semestre_collection" # Correspond à l'attribut dans SessionExamen
+    )
     annee_univ = relationship("AnneeUniversitaire") 
 
     def __repr__(self):
@@ -674,7 +680,7 @@ class Enseignant(Base):
     Enseignant_grade = Column(String(50))
     Enseignant_statut = Column(
         String(10), 
-        CheckConstraint("Enseignant_statut IN ('PERM', 'VAC')", name='check_statut_enseignant'), 
+        CheckConstraint(""" "Enseignant_statut" IN ('PERM', 'VAC') """, name='check_statut_enseignant'),
         nullable=False
     )
     

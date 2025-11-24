@@ -62,61 +62,130 @@ def _generate_annee_data(start_year: int = 2021, end_year: int = 2026) -> list:
         })
     return annee_list
 
-def import_fixed_references(session: Session):
+import pandas as pd
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+# Les imports de vos modèles (Cycle, Niveau, Semestre, etc.) et database_setup sont supposés exister
+
+# --- Fonction d'aide pour la génération d'ID ---
+# Le compteur global pour l'incrémentation peut être initialisé si nécessaire, 
+# mais ici, nous générons l'ID en ligne pour chaque bloc.
+
+def _generate_id(prefix: str, index: int) -> str:
+    """Génère un ID de la forme PREFIX_XXX (où XXX est index formaté sur 3 chiffres)."""
+    # Assurez-vous que le préfixe a exactement 4 caractères comme demandé.
+    if len(prefix) != 4:
+        raise ValueError("Le préfixe de l'ID doit comporter exactement 4 lettres.")
+    return f"{prefix}_{index:03d}"
+
+def import_fixed_references(session: Session, start_year: int = 2021, end_year: int = 2026):
     """
-    Insère les données de référence fixes (Cycles, Niveaux, Semestres, Types Inscription, Sessions, Types Formation, ANNEES UNIVERSITAIRES).
+    Insère les données de référence fixes (Cycles, Niveaux, Semestres, Types Inscription, 
+    Sessions, Types Formation, ANNEES UNIVERSITAIRES) en utilisant les nouveaux schémas d'ID.
     """
     print("\n--- 1. Importation des Données de Référence Fixes (LMD, Types & Années Univ.) ---")
     
-    # 1. Cycles
-    cycles_data = [{'code': 'L', 'label': 'Licence'}, {'code': 'M', 'label': 'Master'}, {'code': 'D', 'label': 'Doctorat'}]
-    for data in cycles_data:
-        session.merge(Cycle(**data))
+    # --- 1. Cycles (Préfixe: CYCL) ---
+    print("1. Cycles...")
+    cycles_data = [
+        {'code': 'L', 'label': 'Licence'}, 
+        {'code': 'M', 'label': 'Master'}, 
+        {'code': 'D', 'label': 'Doctorat'}
+    ]
+    for i, data in enumerate(cycles_data, 1):
+        session.merge(Cycle(
+            Cycle_id=_generate_id('CYCL', i),
+            Cycle_code=data['code'],
+            Cycle_label=data['label']
+        ))
     
-    # 2. Niveaux et Semestres 
+    # --- 2. Niveaux et Semestres (Préfixes: NIVE & SEME) ---
+    print("2. Niveaux et Semestres...")
     niveau_semestre_map = {
         'L1': ('L', ['S01', 'S02']), 'L2': ('L', ['S03', 'S04']), 'L3': ('L', ['S05', 'S06']), 
         'M1': ('M', ['S07', 'S08']), 'M2': ('M', ['S09', 'S10']), 
         'D1': ('D', ['S11', 'S12']), 'D2': ('D', ['S13', 'S14']), 'D3': ('D', ['S15', 'S16']),
     }
     
+    # Dictionnaire temporaire pour mapper les codes de cycle aux IDs générés
+    cycle_code_to_id = {data['code']: _generate_id('CYCL', i) for i, data in enumerate(cycles_data, 1)}
+    
+    niveau_counter = 0
+    semestre_counter = 0
+    
     for niv_code, (cycle_code, sem_list) in niveau_semestre_map.items():
-        session.merge(Niveau(code=niv_code, label=niv_code, cycle_code=cycle_code))
+        niveau_counter += 1
+        niv_id = _generate_id('NIVE', niveau_counter)
+        cycle_id = cycle_code_to_id.get(cycle_code)
+        
+        session.merge(Niveau(
+            Niveau_id=niv_id,
+            Niveau_code=niv_code, # Ex: L1
+            Niveau_label=niv_code,
+            Cycle_id_fk=cycle_id 
+        ))
         
         for sem_num in sem_list:
-            sem_code_complet = f"{niv_code}_{sem_num}" 
+            semestre_counter += 1
+            sem_code_complet = f"{niv_code}_{sem_num}" # Ex: L1_S01
+            
             session.merge(Semestre(
-                code_semestre=sem_code_complet,
-                numero_semestre=sem_num,
-                niveau_code=niv_code 
+                Semestre_id=_generate_id('SEME', semestre_counter),
+                Semestre_code=sem_code_complet,
+                Semestre_numero=sem_num, # Ex: S01
+                Niveau_id_fk=niv_id
             ))
 
-    # 3. Modes Inscription
+    # --- 3. Modes Inscription (Préfixe: MODE) ---
+    print("3. Modes Inscription...")
     modes_inscription_data = [{'code': 'CLAS', 'label': 'Classique'}, {'code': 'HYB', 'label': 'Hybride'}]
-    for data in modes_inscription_data:
-        session.merge(ModeInscription(**data))
+    for i, data in enumerate(modes_inscription_data, 1):
+        session.merge(ModeInscription(
+            ModeInscription_id=_generate_id('MODE', i),
+            ModeInscription_code=data['code'],
+            ModeInscription_label=data['label']
+        ))
         
-    # 4. Insertion des Sessions d'Examen
+    # --- 4. Insertion des Sessions d'Examen (Préfixe: SESS) ---
+    print("4. Sessions d'Examen...")
     session_examen_data = [{'code_session': 'N', 'label': 'Normale'}, {'code_session': 'R', 'label': 'Rattrapage'}]
-    for sess in session_examen_data:
-        session.merge(SessionExamen(**sess))
+    for i, sess in enumerate(session_examen_data, 1):
+        session.merge(SessionExamen(
+            SessionExamen_id=_generate_id('SESS', i),
+            SessionExamen_code=sess['code_session'],
+            SessionExamen_label=sess['label']
+        ))
 
-    # 5. Insertion des Types de Formation
+    # --- 5. Insertion des Types de Formation (Préfixe: TYPE) ---
+    print("5. Types de Formation...")
     types_formation_data = [
         {'code': 'FI', 'label': 'Formation Initiale', 'description': 'Formation classique à temps plein.'},
         {'code': 'FC', 'label': 'Formation Continue', 'description': 'Formation destinée aux professionnels en activité.'},
         {'code': 'FOAD', 'label': 'Formation à Distance', 'description': 'Formation ouverte à distance.'},
     ]
-    for data in types_formation_data:
-        session.merge(TypeFormation(**data))
+    for i, data in enumerate(types_formation_data, 1):
+        session.merge(TypeFormation(
+            TypeFormation_id=_generate_id('TYPE', i),
+            TypeFormation_code=data['code'],
+            TypeFormation_label=data['label'],
+            TypeFormation_description=data['description']
+        ))
         
-    # 6. Insertion des Années Universitaires
-    annees_data = _generate_annee_data(start_year=2021, end_year=2026)
-    for data in annees_data:
-        session.merge(AnneeUniversitaire(**data))
+    # --- 6. Insertion des Années Universitaires (Préfixe: ANNE) ---
+    print("6. Années Universitaires (ANNE)...")
+    # Note: Nous supposons que _generate_annee_data retourne des dictionnaires avec les clés 'annee', 'ordre_annee', 'description'.
+    annees_data = _generate_annee_data(start_year=start_year, end_year=end_year)
+    for i, data in enumerate(annees_data, 1):
+        session.merge(AnneeUniversitaire(
+            AnneeUniversitaire_id=_generate_id('ANNE', i), 
+            # 🚨 CORRECTION DES NOMS D'ATTRIBUTS CI-DESSOUS 🚨
+            AnneeUniversitaire_annee=data['annee'], 
+            AnneeUniversitaire_ordre=data['ordre_annee'],
+            AnneeUniversitaire_description=data['description']
+        ))
         
     session.commit()
-    print("✅ Données de Référence LMD, Types, Sessions et Années Universitaires insérées.")
+    print("✅ Données de Référence LMD, Types, Sessions et Années Universitaires insérées avec les nouveaux ID.")
 
 
 # ----------------------------------------------------------------------
@@ -589,13 +658,13 @@ def import_all_data():
         import_fixed_references(session)
         
         # 2. Importation de la structure académique (Institutions, Composantes, etc.)
-        import_metadata_to_db(session) 
+        #import_metadata_to_db(session) 
         
         # 3. Importation des étudiants et des inscriptions
-        import_inscriptions_to_db(session)
+        #import_inscriptions_to_db(session)
         
         # 4. 🆕 DÉDUCTION ET INSERTION DE LA STRUCTURE TRANSVERSALE
-        _deduce_parcours_niveaux(session)
+        #_deduce_parcours_niveaux(session)
         
         # Un commit final si tout s'est bien passé dans les orchestrateurs
         session.commit() # Les sous-fonctions ont géré les commits nécessaires
