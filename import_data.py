@@ -72,11 +72,36 @@ from sqlalchemy import func
 # mais ici, nous générons l'ID en ligne pour chaque bloc.
 
 def _generate_id(prefix: str, index: int) -> str:
-    """Génère un ID de la forme PREFIX_XXX (où XXX est index formaté sur 3 chiffres)."""
-    # Assurez-vous que le préfixe a exactement 4 caractères comme demandé.
-    if len(prefix) != 4:
-        raise ValueError("Le préfixe de l'ID doit comporter exactement 4 lettres.")
-    return f"{prefix}_{index:03d}"
+    """
+    Génère un ID de la forme PREFIX_XXX, où XXX est index formaté 
+    avec une longueur spécifique à chaque entité (normalisation).
+    """
+    length_map = {
+        'INST': 4, 'DOMA': 2, 'COMP': 4, 'MENT': 6, 'PARC': 7, 
+        'CYCL': 1, 'NIVE': 2, 'SEME': 2, 'SESS': 1, 'TYPE': 2, 
+        'ANNE': 4, 'MODE': 3,
+    }
+
+    if prefix not in length_map:
+        raise ValueError(f"Préfixe d'ID '{prefix}' non reconnu ou non configuré pour la longueur.")
+
+    format_length = length_map[prefix]
+    
+    # 🚨 CORRECTION CI-DESSOUS 🚨
+    if format_length == 1:
+        # Pour une longueur de 1, le formatage standard ':d' est suffisant et plus sûr.
+        formatted_index = f"{index:d}"
+    else:
+        # Pour les longueurs > 1, nous utilisons le remplissage de zéro standard.
+        format_spec = f"0{format_length}d" 
+        formatted_index = format(index, format_spec)
+    # 🚨 FIN DE LA CORRECTION 🚨
+
+    # Vérification de débordement (ID généré > longueur max)
+    if len(formatted_index) > format_length:
+        raise OverflowError(f"Le compteur d'index ({index}) est trop grand pour la longueur d'ID de {format_length} chiffres pour le préfixe '{prefix}'.")
+
+    return f"{prefix}_{formatted_index}"
 
 def import_fixed_references(session: Session, start_year: int = 2021, end_year: int = 2026):
     """
@@ -85,7 +110,7 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
     """
     print("\n--- 1. Importation des Données de Référence Fixes (LMD, Types & Années Univ.) ---")
     
-    # --- 1. Cycles (Préfixe: CYCL) ---
+    # --- 1. Cycles (Préfixe: CYCL, Longueur ID: 1) ---
     print("1. Cycles...")
     cycles_data = [
         {'code': 'L', 'label': 'Licence'}, 
@@ -99,7 +124,7 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
             Cycle_label=data['label']
         ))
     
-    # --- 2. Niveaux et Semestres (Préfixes: NIVE & SEME) ---
+    # --- 2. Niveaux et Semestres (Préfixes: NIVE - 2, SEME - 2) ---
     print("2. Niveaux et Semestres...")
     niveau_semestre_map = {
         'L1': ('L', ['S01', 'S02']), 'L2': ('L', ['S03', 'S04']), 'L3': ('L', ['S05', 'S06']), 
@@ -146,7 +171,7 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
             ModeInscription_label=data['label']
         ))
         
-    # --- 4. Insertion des Sessions d'Examen (Préfixe: SESS) ---
+    # --- 4. Insertion des Sessions d'Examen (Préfixe: SESS, Longueur ID: 1) ---
     print("4. Sessions d'Examen...")
     session_examen_data = [{'code_session': 'N', 'label': 'Normale'}, {'code_session': 'R', 'label': 'Rattrapage'}]
     for i, sess in enumerate(session_examen_data, 1):
@@ -156,7 +181,7 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
             SessionExamen_label=sess['label']
         ))
 
-    # --- 5. Insertion des Types de Formation (Préfixe: TYPE) ---
+    # --- 5. Insertion des Types de Formation (Préfixe: TYPE, Longueur ID: 2) ---
     print("5. Types de Formation...")
     types_formation_data = [
         {'code': 'FI', 'label': 'Formation Initiale', 'description': 'Formation classique à temps plein.'},
@@ -171,14 +196,12 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
             TypeFormation_description=data['description']
         ))
         
-    # --- 6. Insertion des Années Universitaires (Préfixe: ANNE) ---
+    # --- 6. Insertion des Années Universitaires (Préfixe: ANNE, Longueur ID: 4) ---
     print("6. Années Universitaires (ANNE)...")
-    # Note: Nous supposons que _generate_annee_data retourne des dictionnaires avec les clés 'annee', 'ordre_annee', 'description'.
     annees_data = _generate_annee_data(start_year=start_year, end_year=end_year)
     for i, data in enumerate(annees_data, 1):
         session.merge(AnneeUniversitaire(
             AnneeUniversitaire_id=_generate_id('ANNE', i), 
-            # 🚨 CORRECTION DES NOMS D'ATTRIBUTS CI-DESSOUS 🚨
             AnneeUniversitaire_annee=data['annee'], 
             AnneeUniversitaire_ordre=data['ordre_annee'],
             AnneeUniversitaire_description=data['description']
@@ -186,66 +209,81 @@ def import_fixed_references(session: Session, start_year: int = 2021, end_year: 
         
     session.commit()
     print("✅ Données de Référence LMD, Types, Sessions et Années Universitaires insérées avec les nouveaux ID.")
-
-
 # ----------------------------------------------------------------------
 # FONCTIONS D'IMPORTATION UNITAIRE DE LA STRUCTURE ACADÉMIQUE
 # ----------------------------------------------------------------------
+# --- 1. Importation des Institutions (ID généré INST_XXXX) ---
 
-def _import_institutions(session: Session) -> bool:
-    """Charge et importe la table Institution."""
-    print("\n--- Importation des Institutions ---")
+def _import_institutions(session: Session) -> dict:
+    """Charge et importe la table Institution en générant les IDs (INST_XXXX)."""
+    print("\n--- Importation des Institutions (INST) ---")
+    institution_code_to_id = {}
     try:
         df_inst = pd.read_excel(config.INSTITUTION_FILE_PATH)
         df_inst.columns = df_inst.columns.str.lower().str.replace(' ', '_')
         df_inst = df_inst.where(pd.notnull(df_inst), None)
         
-        df_inst['institution_id'] = df_inst['institution_id'].astype(str).apply(safe_string)
-        # Gestion des doublons et des NaN
-        df_inst_clean = df_inst.drop_duplicates(subset=['institution_id']).dropna(subset=['institution_id'])
-        
-        for _, row in tqdm(df_inst_clean.iterrows(), total=len(df_inst_clean), desc="Institutions"):
-            inst_id = row['institution_id']
-            logo_path = None
+        key_code = 'institution_code'
+        if key_code not in df_inst.columns:
+            print(f"❌ Colonne '{key_code}' manquante. Impossible de lire la source Institutions.", file=sys.stderr)
+            return {}
             
-            # Logique d'ajout du chemin du logo (inchangée)
-            logo_base_name = f"{inst_id}"
-            for ext in ['.jpg', '.png']:
-                potential_path = os.path.join(config.LOGO_FOLDER_PATH, logo_base_name + ext)
-                if os.path.exists(potential_path):
-                    logo_path = potential_path
-                    break 
+        df_inst_clean = df_inst.drop_duplicates(subset=[key_code]).dropna(subset=[key_code])
+        
+        inst_counter = 0
+        for _, row in tqdm(df_inst_clean.iterrows(), total=len(df_inst_clean), desc="Institutions"):
+            inst_counter += 1
+            inst_code = safe_string(row[key_code])
+            inst_id = _generate_id('INST', inst_counter) # ID INST_XXXX
+            institution_code_to_id[inst_code] = inst_id 
+            
+            logo_path = None 
 
             session.merge(Institution(
-                id_institution=inst_id, 
-                nom=safe_string(row['institution_nom']),
-                type_institution=safe_string(row['institution_type']),
-                logo_path=logo_path 
+                Institution_id=inst_id, 
+                Institution_code=inst_code, 
+                Institution_nom=safe_string(row['institution_nom']),
+                Institution_type=safe_string(row['institution_type']),
+                Institution_description=safe_string(row['institution_description']) if 'institution_description' in row else None,
+                Institution_abbreviation=safe_string(row['institution_abbreviation']) if 'institution_abbreviation' in row else None,
+                Institution_logo_path=logo_path 
             ))
         
-        # 🚨 COMMIT CRITIQUE : Permet aux Composantes de voir les Institutions (Clé Étrangère)
         session.commit()
-        print("✅ Importation des Institutions terminée et commitée.")
-        return True
+        print(f"✅ Importation des Institutions terminée ({inst_counter} lignes) et commitée.")
+        return institution_code_to_id
         
     except Exception as e:
         print(f"❌ ERREUR: Impossible de lire ou d'importer le fichier Institutions. {e}", file=sys.stderr)
         session.rollback()
-        return False
+        return {}
 
+
+# --- 2. Chargement des Métadonnées Académiques (inchangé) ---
 
 def _load_and_clean_metadata():
     """Charge et nettoie le fichier de métadonnées académiques."""
     try:
         df = pd.read_excel(config.METADATA_FILE_PATH)
         df.columns = df.columns.str.lower().str.replace(' ', '_')
-        df = df.where(pd.notnull(df), None)
         print(f"Fichier de métadonnées académiques chargé. {len(df)} lignes trouvées.")
         
-        # Nettoyage et standardisation des clés
-        for col in ['institution_id', 'composante', 'domaine', 'id_mention', 'id_parcours']:
-             if col in df.columns:
-                 df[col] = df[col].astype(str).apply(safe_string)
+        cols_to_clean = [
+            'institution_code', 'composante_code', 'domaine_code', 
+            'mention_code', 'parcours_code', 'typeformation_code' 
+        ]
+        
+        for col in cols_to_clean:
+            if col in df.columns:
+                # 1. Convertir en string et appliquer safe_string
+                df[col] = df[col].astype(str).apply(safe_string)
+                
+                # 2. 🚨 Gérer explicitement les chaînes indiquant une valeur manquante 🚨
+                #    Nous ciblons 'None', 'nan', et les strings vides.
+                df[col] = df[col].replace(['None', 'none', 'nan', ''], None) 
+                
+        # 3. Assurer que les valeurs manquantes (y compris celles remplacées ci-dessus) sont bien des None/NULL
+        df = df.where(pd.notnull(df), None)
         
         return df
         
@@ -253,100 +291,210 @@ def _load_and_clean_metadata():
         print(f"❌ ERREUR: Impossible de lire le fichier de métadonnées académiques. {e}", file=sys.stderr)
         return None
 
+# --- 3. Importation des Composantes (ID généré COMP_XXXX) ---
 
-def _import_composantes(session: Session, df: pd.DataFrame):
-    """Importe les Composantes (dépend d'Institution)."""
-    print("\n--- Importation des Composantes ---")
-    if 'composante' not in df.columns:
-        print("Colonne 'composante' manquante dans les métadonnées.")
+def _import_composantes(session: Session, df: pd.DataFrame, inst_map: dict) -> dict:
+    """Importe les Composantes (dépend d'Institution) avec ID généré (COMP_XXXX)."""
+    print("\n--- Importation des Composantes (COMP) ---")
+    composante_code_to_id = {}
+    
+    cols_comp = ['composante_code', 'composante_label', 'institution_code', 'composante_abbreviation']
+    if not all(col in df.columns for col in cols_comp):
+        print(f"Colonnes de Composante manquantes dans les métadonnées. Attendu: {cols_comp}")
+        return {}
+        
+    df_composantes = df[cols_comp].drop_duplicates(
+        subset=['composante_code']).dropna(subset=['composante_code', 'institution_code'])
+    
+    comp_counter = 0
+    for _, row in tqdm(df_composantes.iterrows(), total=len(df_composantes), desc="Composantes"):
+        comp_code = row['composante_code']
+        inst_code = row['institution_code']
+        
+        inst_id_fk = inst_map.get(inst_code)
+        if not inst_id_fk:
+             print(f"⚠️ Institution code {inst_code} non trouvé pour Composante {comp_code}. Ligne ignorée/problématique.")
+             continue
+
+        comp_counter += 1
+        comp_id = _generate_id('COMP', comp_counter) # ID COMP_XXXX
+        composante_code_to_id[comp_code] = comp_id
+        
+        session.merge(Composante(
+            Composante_id=comp_id, 
+            Composante_code=comp_code, 
+            Composante_label=safe_string(row['composante_label']),
+            Composante_abbreviation=safe_string(row['composante_abbreviation']),
+            Institution_id_fk=inst_id_fk,
+        ))
+    
+    print(f"✅ {comp_counter} Composantes en attente de commit.")
+    return composante_code_to_id
+
+# --- 4. Importation des Domaines (ID généré DOMA_XX) ---
+
+def _import_domaines(session: Session, df: pd.DataFrame) -> dict:
+    """Importe les Domaines avec ID généré (DOMA_XX)."""
+    print("\n--- Importation des Domaines (DOMA) ---")
+    domaine_code_to_id = {}
+    
+    cols_doma = ['domaine_code', 'domaine_label']
+    if not all(col in df.columns for col in cols_doma):
+          print(f"Colonnes de Domaine manquantes dans les métadonnées. Attendu: {cols_doma}")
+          return {}
+          
+    df_domaines = df[cols_doma].drop_duplicates(subset=['domaine_code']).dropna(subset=['domaine_code'])
+    
+    doma_counter = 0
+    for _, row in tqdm(df_domaines.iterrows(), total=len(df_domaines), desc="Domaines"):
+        doma_code = row['domaine_code']
+        doma_counter += 1
+        doma_id = _generate_id('DOMA', doma_counter) # ID DOMA_XX
+        domaine_code_to_id[doma_code] = doma_id
+        
+        session.merge(Domaine(
+            Domaine_id=doma_id, 
+            Domaine_code=doma_code, 
+            Domaine_label=safe_string(row['domaine_label'])
+        ))
+        
+    print(f"✅ {doma_counter} Domaines en attente de commit.")
+    return domaine_code_to_id
+
+# --- 5. Importation des Mentions (ID généré MENT_XXXXXX) ---
+
+def _import_mentions(session: Session, df: pd.DataFrame, comp_map: dict, doma_map: dict) -> dict:
+    """Importe les Mentions (dépend de Composante et Domaine) avec ID généré (MENT_XXXXXX)."""
+    print("\n--- Importation des Mentions (MENT) ---")
+    mention_code_to_id = {}
+
+    cols_ment = ['mention_code', 'mention_label', 'composante_code', 'domaine_code', 'mention_abbreviation']
+    if not all(col in df.columns for col in cols_ment):
+          print(f"Colonnes de Mention manquantes dans les métadonnées. Attendu: {cols_ment}")
+          return {}
+          
+    df_mentions_source = df[cols_ment].drop_duplicates(
+        subset=['mention_code']).dropna(subset=['composante_code', 'domaine_code', 'mention_code'])
+    
+    ment_counter = 0
+    for _, row in tqdm(df_mentions_source.iterrows(), total=len(df_mentions_source), desc="Mentions"):
+        ment_code = safe_string(row['mention_code'])
+        comp_code = row['composante_code']
+        doma_code = row['domaine_code']
+
+        comp_id_fk = comp_map.get(comp_code)
+        doma_id_fk = doma_map.get(doma_code)
+        
+        if not comp_id_fk:
+             print(f"⚠️ Composante code {comp_code} non trouvé pour Mention {ment_code}. Ligne ignorée.")
+             continue
+        if not doma_id_fk:
+             print(f"⚠️ Domaine code {doma_code} non trouvé pour Mention {ment_code}. Ligne ignorée.")
+             continue
+        
+        ment_counter += 1
+        ment_id = _generate_id('MENT', ment_counter) # ID MENT_XXXXXX
+        
+        mention_code_to_id[ment_code] = ment_id # Stockage du mapping (code -> ID généré)
+        
+        session.merge(Mention(
+            Mention_id=ment_id, 
+            Mention_code=ment_code, 
+            Mention_label=safe_string(row['mention_label']),
+            Mention_abbreviation=safe_string(row['mention_abbreviation']),
+            Composante_id_fk=comp_id_fk,
+            Domaine_id_fk=doma_id_fk
+        ))
+        
+    print(f"✅ {ment_counter} Mentions en attente de commit.")
+    return mention_code_to_id
+
+# --- 6. Importation des Parcours (ID généré PARC_XXXXXXX) ---
+
+def _import_parcours(session: Session, df: pd.DataFrame, ment_map_code_to_id: dict):
+    """Importe les Parcours (dépend de Mention) avec ID généré (PARC_XXXXXXX)."""
+    print("\n--- Importation des Parcours (PARC) ---")
+    
+    # 1. 🚨 Récupération du mapping Type Formation (CODE -> ID) 🚨
+    # Ceci nécessite que la table 'types_formation' ait été remplie par import_fixed_references
+    try:
+        mapping_result = session.query(
+            TypeFormation.TypeFormation_code, 
+            TypeFormation.TypeFormation_id
+        ).all()
+        # Création du dictionnaire {code: id}
+        type_formation_map = {code: id_ for code, id_ in mapping_result}
+        
+        if not type_formation_map:
+             print("❌ ERREUR: La table TypesFormation est vide. L'importation des parcours ne peut pas continuer.")
+             return
+             
+    except Exception as e:
+        print(f"❌ ERREUR lors de la récupération du mapping TypeFormation: {e}")
         return
         
-    # Filtrage des doublons sur la clé primaire/unique
-    df_composantes = df[['composante', 'label_composante', 'institution_id']].drop_duplicates(
-        subset=['composante']).dropna(subset=['composante', 'institution_id'])
-    
-    for _, row in tqdm(df_composantes.iterrows(), total=len(df_composantes), desc="Composantes"):
-        composante_code = row['composante']
-        logo_path = None
-        
-        # Logique d'ajout du chemin du logo
-        logo_base_name = f"{composante_code}"
-        for ext in ['.jpg', '.png']:
-            potential_path = os.path.join(config.LOGO_FOLDER_PATH, logo_base_name + ext)
-            if os.path.exists(potential_path):
-                logo_path = potential_path
-                break 
-                
-        session.merge(Composante(
-            code=composante_code, 
-            label=safe_string(row['label_composante']),
-            id_institution=row['institution_id'],
-            logo_path=logo_path
-        ))
-
-
-def _import_domaines(session: Session, df: pd.DataFrame):
-    """Importe les Domaines."""
-    print("\n--- Importation des Domaines ---")
-    if 'domaine' not in df.columns:
-          print("Colonne 'domaine' manquante dans les métadonnées.")
+    # Colonnes nécessaires à l'importation
+    cols_parc = ['parcours_code', 'parcours_label', 'mention_code', 'date_creation', 'date_fin', 'typeformation_code', 'parcours_abbreviation']
+    if not all(col in df.columns for col in cols_parc):
+          print(f"Colonnes de Parcours manquantes dans les métadonnées. Attendu: {cols_parc}")
           return
           
-    df_domaines = df[['domaine', 'label_domaine']].drop_duplicates(subset=['domaine']).dropna(subset=['domaine'])
-    
-    for _, row in tqdm(df_domaines.iterrows(), total=len(df_domaines), desc="Domaines"):
-        session.merge(Domaine(code=row['domaine'], label=safe_string(row['label_domaine'])))
+    # Nettoyage pour garder uniquement les lignes uniques et non nulles sur les clés principales
+    df_parcours = df[cols_parc].drop_duplicates(
+        subset=['parcours_code']).dropna(subset=['mention_code', 'parcours_code'])
 
-
-def _import_mentions(session: Session, df: pd.DataFrame):
-    """Importe les Mentions (dépend de Composante et Domaine)."""
-    print("\n--- Importation des Mentions ---")
-    if 'id_mention' not in df.columns:
-          print("Colonne 'id_mention' manquante dans les métadonnées.")
-          return
-          
-    # Correction de la duplication: on utilise id_mention comme clé d'unicité
-    df_mentions_source = df[['mention', 'label_mention', 'id_mention', 'composante', 'domaine']].drop_duplicates(
-        subset=['id_mention']).dropna(subset=['id_mention', 'composante', 'domaine', 'mention'])
-    
-    for _, row in tqdm(df_mentions_source.iterrows(), total=len(df_mentions_source), desc="Mentions"):
-        session.merge(Mention(
-            id_mention=row['id_mention'], 
-            code_mention=safe_string(row['mention']),
-            label=safe_string(row['label_mention']),
-            composante_code=row['composante'], 
-            domaine_code=row['domaine']
-        ))
-    return df_mentions_source 
-
-
-def _import_parcours(session: Session, df: pd.DataFrame, df_mentions_source: pd.DataFrame):
-    """Importe les Parcours (dépend de Mention)."""
-    print("\n--- Importation des Parcours ---")
-    
-    if 'id_parcours' not in df.columns:
-          print("Colonne 'id_parcours' manquante dans les métadonnées.")
-          return
-          
-    df_parcours = df[['id_parcours', 'parcours', 'label_parcours', 'id_mention', 'date_creation', 'date_fin']].copy()
-    
-    df_parcours = df_parcours.drop_duplicates(subset=['id_parcours'], keep='first').dropna(subset=['id_parcours', 'id_mention', 'parcours'])
-
+    parc_counter = 0
     for _, row in tqdm(df_parcours.iterrows(), total=len(df_parcours), desc="Parcours"):
         
-        # Le type Integer pour date_creation/fin est conservé
+        parc_code = safe_string(row['parcours_code'])
+        ment_code_fk = safe_string(row['mention_code']) 
+
+        # 2. Résolution de la clé étrangère Mention_id_fk via le mapping code -> ID
+        ment_id_fk = ment_map_code_to_id.get(ment_code_fk)
+        
+        if not ment_id_fk:
+             print(f"⚠️ Mention code {ment_code_fk} non trouvé pour Parcours {parc_code}. Ligne ignorée.")
+             continue
+
+        # Génération d'ID
+        parc_counter += 1
+        parc_id = _generate_id('PARC', parc_counter) # ID PARC_XXXXXXX
+
+        # Conversion des dates
         date_creation_val = int(row['date_creation']) if pd.notna(row['date_creation']) and row['date_creation'] is not None else None
         date_fin_val = int(row['date_fin']) if pd.notna(row['date_fin']) and row['date_fin'] is not None else None
         
-        session.merge(Parcours(
-            id_parcours=row['id_parcours'], 
-            code_parcours=safe_string(row['parcours']), 
-            label=safe_string(row['label_parcours']),
-            mention_id=row['id_mention'], 
-            date_creation=date_creation_val,
-            date_fin=date_fin_val
-        ))
+        # 3. Récupération et résolution du Type Formation
+        type_formation_code = row['typeformation_code']
+        
+        if type_formation_code is None:
+            # Si le code est manquant dans le fichier (devient NULL en DB)
+            type_formation_id_fk = None 
+        else:
+            # Conversion du CODE ('FI', 'FC', ...) en ID technique ('TYPE_01', 'TYPE_02', ...)
+            type_formation_id_fk = type_formation_map.get(type_formation_code)
+            
+            if type_formation_id_fk is None:
+                # Gérer le cas où un code existe mais n'est pas dans la table de référence
+                print(f"⚠️ Type Formation code {type_formation_code} non trouvé dans la table de référence. NULL sera utilisé (si permis).")
 
+
+        session.merge(Parcours(
+            Parcours_id=parc_id, 
+            Parcours_code=parc_code,
+            Parcours_label=safe_string(row['parcours_label']),
+            Parcours_abbreviation=safe_string(row['parcours_abbreviation']),
+            Mention_id_fk=ment_id_fk, 
+            # 4. Utilisation de l'ID technique
+            Parcours_type_formation_defaut_id_fk=type_formation_id_fk,
+            Parcours_date_creation=date_creation_val,
+            Parcours_date_fin=date_fin_val
+        ))
+        
+    print(f"✅ {parc_counter} Parcours en attente de commit.")
+
+
+# --- 7. Orchestrateur Principal (inchangé) ---
 
 def import_metadata_to_db(session: Session):
     """
@@ -355,30 +503,35 @@ def import_metadata_to_db(session: Session):
     print(f"\n--- 2. Démarrage de l'importation des métadonnées ---")
 
     try:
-        # Importe et commit les Institutions (Clé parent)
-        if not _import_institutions(session):
+        # 1. Importe et commit les Institutions
+        inst_map = _import_institutions(session)
+        if not inst_map:
             return
 
+        # 2. Chargement et nettoyage des données
         df_metadata = _load_and_clean_metadata()
         if df_metadata is None:
             return
         
-        # Le reste des tables dépend de l'institution déjà commitée
-        _import_composantes(session, df_metadata) 
-        _import_domaines(session, df_metadata)
+        # 3. Importation des tables générant des IDs et des mappings
+        comp_map = _import_composantes(session, df_metadata, inst_map) 
+        doma_map = _import_domaines(session, df_metadata) 
         
-        df_mentions_source = _import_mentions(session, df_metadata) 
+        # 4. Importation de Mention (code -> ID généré)
+        ment_map_code_to_id = _import_mentions(session, df_metadata, comp_map, doma_map) 
 
-        _import_parcours(session, df_metadata, df_mentions_source) 
+        # 5. Importation des Parcours (utilise ment_map_code_to_id)
+        if ment_map_code_to_id:
+            _import_parcours(session, df_metadata, ment_map_code_to_id) 
 
-        session.commit() # Commit final de toutes les tables académiques dépendantes
+        # 6. Commit final
+        session.commit() 
         print("\n✅ Importation des métadonnées académiques (Composante, Domaine, Mention, Parcours) terminée avec succès.")
 
     except Exception as e:
         session.rollback()
         print(f"\n❌ ERREUR D'IMPORTATION (Métadonnées): {e}", file=sys.stderr)
-
-
+        
 # ----------------------------------------------------------------------
 # FONCTIONS D'IMPORTATION UNITAIRE DES INSCRIPTIONS
 # ----------------------------------------------------------------------
@@ -658,7 +811,7 @@ def import_all_data():
         import_fixed_references(session)
         
         # 2. Importation de la structure académique (Institutions, Composantes, etc.)
-        #import_metadata_to_db(session) 
+        import_metadata_to_db(session) 
         
         # 3. Importation des étudiants et des inscriptions
         #import_inscriptions_to_db(session)

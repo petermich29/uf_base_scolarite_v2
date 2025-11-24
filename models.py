@@ -122,7 +122,7 @@ class Parcours(Base):
     
     # Clés et identifiants
     Parcours_id = Column(String(15), primary_key=True) # String de taille 15
-    Parcours_code = Column(String(20), nullable=False)
+    Parcours_code = Column(String(50), nullable=False)
     
     # Attributs
     Parcours_label = Column(String(100))
@@ -139,11 +139,11 @@ class Parcours(Base):
         nullable=False
     )
 
-    Parcours_type_formation_defaut_code_fk = Column(
-        String(10), 
-        ForeignKey('types_formation.TypeFormation_code'), 
+    Parcours_type_formation_defaut_id_fk = Column(
+        String(7), # Taille ajustée à la longueur de votre ID (ex: TYPE_01)
+        ForeignKey('types_formation.TypeFormation_id'), # 👈 Clé étrangère sur l'ID
         nullable=False, 
-        default='FI' 
+        default='TYPE_01' # 👈 Le nouvel ID par défaut de 'FI'
     )
 
     # Relations
