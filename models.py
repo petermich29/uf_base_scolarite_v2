@@ -129,8 +129,8 @@ class Parcours(Base):
     Parcours_description = Column(Text, nullable=True) 
     Parcours_abbreviation = Column(String(20), nullable=True)
     Parcours_logo_path = Column(String(255), nullable=True)
-    Parcours_date_creation = Column(Integer, nullable=True)
-    Parcours_date_fin = Column(Integer, nullable=True)
+    Parcours_date_creation = Column(Date, nullable=True)
+    Parcours_date_fin = Column(Date, nullable=True)
 
     # Clés étrangères mises à jour
     Mention_id_fk = Column(

@@ -58,7 +58,10 @@ def import_fixed_references(session: Session, start_year=2021, end_year=2026):
         'L2': ('L', ['S03', 'S04']),
         'L3': ('L', ['S05', 'S06']),
         'M1': ('M', ['S07', 'S08']),
-        'M2': ('M', ['S09', 'S10'])
+        'M2': ('M', ['S09', 'S10']),
+        'D1': ('D', ['S11', 'S12']),
+        'D2': ('D', ['S13', 'S14']),   
+        'D3': ('D', ['S15', 'S16']),     
     }
 
     niv_i = sem_i = 0
