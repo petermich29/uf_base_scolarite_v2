@@ -386,7 +386,6 @@ class Etudiant(Base):
     
     # Clés et identifiants
     Etudiant_id = Column(String(50), primary_key=True) 
-    Etudiant_code = Column(String(50), unique=True) # L'ancien code_etudiant renommé
     
     # Attributs
     Etudiant_numero_inscription = Column(String(100))
@@ -404,7 +403,7 @@ class Etudiant(Base):
     Etudiant_adresse = Column(String(255))
     Etudiant_telephone = Column(String(50))
     Etudiant_mail = Column(String(100))
-    Etudiant_cin = Column(String(100))
+    Etudiant_cin = Column(String(15))
     Etudiant_cin_date = Column(Date, nullable=True)
     Etudiant_cin_lieu = Column(String(100))
     Etudiant_photo_profil_path = Column(String(255), nullable=True)
@@ -434,8 +433,9 @@ class Inscription(Base):
     )
     
     # Clés et identifiants
-    Inscription_id = Column(String(100), primary_key=True)
-    Inscription_code = Column(String(100), unique=True) # Code d'inscription si différent de l'ID
+    # 🚨 CHANGEMENT : Inscription_code est utilisé comme clé primaire Inscription_id 🚨
+    Inscription_code = Column(String(100), primary_key=True)
+    # L'ancienne Inscription_id est supprimée. L'ancienne Inscription_code est la nouvelle PK.
     
     # Clés étrangères
     Etudiant_id_fk = Column(
@@ -449,31 +449,32 @@ class Inscription(Base):
         nullable=False
     )
     Parcours_id_fk = Column(
-        String(15), # Taille mise à jour
+        String(15), 
         ForeignKey('parcours.Parcours_id'), 
         nullable=False
     )
     Semestre_id_fk = Column(
-        String(10), # Taille mise à jour
+        String(10), 
         ForeignKey('semestres.Semestre_id'), 
         nullable=False
     )
     ModeInscription_id_fk = Column(
-        String(10), # Taille mise à jour
+        String(10), 
         ForeignKey('modes_inscription.ModeInscription_id'), 
-        nullable=False
+        nullable=True 
     ) 
     
     # Attributs
+    Inscription_date = Column(Date, nullable=False)
     Inscription_credit_acquis_semestre = Column(Integer, default=0) 
     Inscription_is_semestre_valide = Column(Boolean, default=False) 
     
-    # Relations
+    # Relations (inchangées)
     etudiant = relationship("Etudiant", back_populates="inscriptions")
     annee_univ = relationship("AnneeUniversitaire", back_populates="inscriptions") 
     parcours = relationship("Parcours", backref="inscriptions")
     semestre = relationship("Semestre", back_populates="inscriptions")
-    mode_inscription = relationship("ModeInscription", back_populates="inscriptions") 
+    mode_inscription = relationship("ModeInscription", back_populates="inscriptions")
 
 
 class ResultatSemestre(Base):
