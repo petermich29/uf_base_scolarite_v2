@@ -181,7 +181,7 @@ def _import_inscriptions_details(session, df, parc_map, sem_map, annee_map, mode
     for _, row in tqdm(df.iterrows(), total=len(df), desc="Inscriptions"):
 
         session.merge(Inscription(
-            Inscription_code=row["inscription_code"],
+            Inscription_id=row["inscription_code"],
             Etudiant_id_fk=row["etudiant_id"],
             Parcours_id_fk=parc_map.get(row["parcours_code"]),
             Semestre_id_fk=sem_map.get(row["code_semestre_cle"]),
