@@ -114,6 +114,7 @@ def _import_etudiants(session: Session, df: pd.DataFrame):
         try:
             session.merge(Etudiant(
                 Etudiant_id=safe_string(row["etudiant_id"]),
+                Etudiant_numero_inscription=safe_string(row.get("etudiant_numero_inscription")),
                 Etudiant_nom=safe_string(row["etudiant_nom"]),
                 Etudiant_prenoms=safe_string(row.get("etudiant_prenoms")),
                 Etudiant_sexe=safe_string(row.get("etudiant_sexe", "A")),
